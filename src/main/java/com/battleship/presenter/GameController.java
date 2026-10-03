@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/game")
 @CrossOrigin(origins = "*") // Hỗ trợ dev local không bị chặn CORS
-public class GameController{
+public class GameController {
 
     private final GameManager gameManager = GameManager.getInstance();
     private final SettingsManager settingsManager = SettingsManager.getInstance();

@@ -1,0 +1,134 @@
+/* ===== grid.css - DEV 3 (lưới 10x10, kéo thả, tàu, hiệu ứng bắn) ===== */
+:root {
+  --cell: clamp(28px, 4.4vw, 44px);
+  --gap: 1px;
+  --pad: 4px;
+  --sea-1: #0f4c75;
+  --sea-2: #1b6ca8;
+  --grid-line: rgba(255, 255, 255, 0.18);
+  --ok: rgba(80, 200, 120, 0.55);
+  --bad: rgba(230, 70, 70, 0.55);
+}
+
+/* ---------- Bố cục 2 panel ---------- */
+.battle-area { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 32px; }
+.board-panel { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.board-title { margin: 0; font-size: 1.1rem; }
+.board-panel.hidden { display: none; }
+
+/* ---------- Lưới 10x10 bằng CSS Grid ---------- */
+.grid {
+  position: relative; /* để đặt ảnh tàu theo cột/hàng */
+  display: grid;
+  grid-template-columns: repeat(10, var(--cell));
+  grid-template-rows: repeat(10, var(--cell));
+  gap: var(--gap);
+  padding: var(--pad);
+  background: #0a3350;
+  border: 3px solid #072436;
+  border-radius: 6px;
+  user-select: none;
+}
+.cell {
+  position: relative;
+  background: linear-gradient(135deg, var(--sea-2), var(--sea-1));
+  outline: 1px solid var(--grid-line);
+  outline-offset: -1px;
+}
+.cell.ship { cursor: pointer; }
+.grid.locked .cell.ship { cursor: default; }
+
+/* Xem trước khi kéo: lớp phủ nằm TRÊN ảnh tàu để luôn thấy xanh/đỏ */
+.cell.preview-ok::before, .cell.preview-bad::before { content: ""; position: absolute; inset: 0; z-index: 4; }
+.cell.preview-ok::before  { background: var(--ok); }
+.cell.preview-bad::before { background: var(--bad); }
+
+/* ---------- Ảnh tàu đặt trên lưới ---------- */
+.ship-img {
+  --len: calc(var(--n) * var(--cell) + (var(--n) - 1) * var(--gap) - 4px);
+  position: absolute;
+  z-index: 2;
+  width: var(--len);
+  height: auto;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
+  left: calc(var(--pad) + var(--col) * (var(--cell) + var(--gap)) + 2px);
+  top: calc(var(--pad) + var(--row) * (var(--cell) + var(--gap)));
+  transform: translateY(calc(var(--cell) - 100%)); /* thân tàu nằm sát đáy hàng, cột buồm tràn lên trên */
+}
+/* Tàu dọc: xoay 90° theo chiều kim đồng hồ (mũi tàu hướng xuống), căn giữa cột */
+.ship-img.vertical {
+  transform-origin: 0 0;
+  left: calc(var(--pad) + var(--col) * (var(--cell) + var(--gap)));
+  top: calc(var(--pad) + var(--row) * (var(--cell) + var(--gap)) + 2px);
+  transform: translateX(calc((var(--cell) + var(--len) / var(--ratio)) / 2)) rotate(90deg);
+}
+
+/* ---------- Kho tàu (dock) ---------- */
+.dock { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; min-height: calc(var(--cell) * 1.5); padding: 8px; }
+.dock-ship {
+  position: relative;
+  padding: 4px;
+  border: 2px dashed transparent;
+  border-radius: 4px;
+  cursor: grab;
+}
+.dock-ship.selected { border-color: #ffd23f; }
+.dock-ship.placed { display: none; }
+.dock-ship.disabled { cursor: not-allowed; opacity: 0.5; }
+.dock-ship .ship-thumb { display: block; width: calc(var(--n) * var(--cell)); height: auto; pointer-events: none; }
+.dock-ship.vertical { width: calc(var(--n) * var(--cell) / var(--ratio)); height: calc(var(--n) * var(--cell)); box-sizing: content-box; }
+.dock-ship.vertical .ship-thumb {
+  position: absolute; top: 4px; left: 4px;
+  transform-origin: 0 0;
+  transform: translateX(calc(var(--n) * var(--cell) / var(--ratio))) rotate(90deg);
+}
+
+/* ---------- Nút FIRE ---------- */
+.fire-btn { padding: 10px 28px; font-size: 1.1rem; font-weight: 700; border: 0; border-radius: 6px; background: #e63946; color: #fff; cursor: pointer; }
+.fire-btn:disabled { background: #6b7280; opacity: 0.5; cursor: not-allowed; }
+.fire-btn.hidden { display: none; }
+.fire-btn:not(:disabled) { animation: pulse 1.2s infinite; }
+
+/* ---------- Lưới địch: bật/tắt theo lượt ---------- */
+.grid.enemy .cell { cursor: crosshair; }
+.grid.enemy.disabled { pointer-events: none; filter: grayscale(0.5) brightness(0.85); }
+.grid.enemy .cell.miss, .grid.enemy .cell.hit, .grid.enemy .cell.sunk { cursor: not-allowed; }
+
+/* ---------- Hiệu ứng bắn (sprite) ---------- */
+.fx { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+
+.fx-sprite {
+  position: absolute;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+/* Kích thước từng loại = bội số của 1 ô, tỉ lệ theo khung hình gốc */
+.fx-fire      { width: calc(var(--cell) * 0.95); aspect-ratio: 162 / 182; left: 50%; bottom: 6%; transform: translateX(-50%); }
+.fx-explosion { width: calc(var(--cell) * 2);    aspect-ratio: 224 / 215; left: 50%; top: 50%;   transform: translate(-50%, -52%); }
+.fx-splash    { width: calc(var(--cell) * 1.6);  aspect-ratio: 234 / 236; left: 50%; top: 50%;   transform: translate(-50%, -58%); }
+
+/* Đạn bay: gắn vào <body>, dùng vị trí theo màn hình */
+.fx-missile {
+  position: fixed; left: 0; top: 0; z-index: 1000;
+  width: calc(var(--cell) * 1.8); aspect-ratio: 236 / 46;
+  background-repeat: no-repeat; pointer-events: none; will-change: transform;
+}
+
+/* Dấu vết còn lại sau khi bắn trượt (animation nước tự biến mất theo thiết kế) */
+.cell.miss::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 26%; height: 26%;
+  transform: translate(-50%, -50%); border: 2px solid rgba(255, 255, 255, 0.75);
+  border-radius: 50%; z-index: 1;
+}
+.cell.hit  { background: rgba(255, 110, 30, 0.28); }
+.cell.sunk { background: rgba(60, 20, 10, 0.55); }
+
+/* ---------- Rung khi thao tác sai / tàu chìm (không tạo stacking context) ---------- */
+.cell.shake { animation: shake 0.3s; }
+@keyframes shake { 25% { left: -3px; } 75% { left: 3px; } }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(230, 57, 70, 0.35); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fire-btn { animation: none !important; }
+}

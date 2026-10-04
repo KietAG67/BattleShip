@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dev 3 - Demo Board View (chạy không cần Java)</title>
+  <link rel="stylesheet" href="./css/grid.css">
+  <style>
+    body { margin: 0; padding: 24px; font-family: system-ui, sans-serif; background: #071c2c; color: #e8f1f8; }
+    h1 { font-size: 1.3rem; text-align: center; }
+    .controls { text-align: center; margin: 16px 0; }
+    #log { max-width: 640px; margin: 16px auto; font-size: 0.9rem; opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <h1>Dev 3 - Demo (Java giả lập, chỉ để test giao diện)</h1>
+
+  <div class="battle-area">
+    <section class="board-panel">
+      <h2 class="board-title">Your fleet</h2>
+      <div id="player-grid"></div>
+      <div id="dock" class="dock"></div>
+      <div class="controls"><button id="fire-btn" class="fire-btn" disabled>FIRE</button></div>
+    </section>
+
+    <section id="enemy-panel" class="board-panel hidden">
+      <h2 class="board-title">Enemy waters</h2>
+      <div id="enemy-grid"></div>
+    </section>
+  </div>
+  <div id="log"></div>
+
+  <script type="module">
+    import { BoardView } from './js/view/boardView.js';
+
+    const log = (t) => (document.getElementById('log').textContent = t);
+    const rnd = (n) => Math.floor(Math.random() * n);
+
+    // ===== MOCK JAVA (chỉ để test giao diện; Java thật do Dev 1 & 2 viết) =====
+    const SIZES = [5, 4, 3, 2];
+    const cellsOf = (s) => Array.from({ length: s.size }, (_, i) => s.horizontal ? [s.x + i, s.y] : [s.x, s.y - i]);
+    const mkBoard = (ships) => ({ ships: ships.map((s) => ({ ...s, hits: 0 })), shots: new Set() });
+    function fire(board, x, y) { // trả HIT | MISS | SUNK | INVALID
+      const k = x + ',' + y;
+      if (board.shots.has(k)) return 'INVALID';
+      board.shots.add(k);
+      const ship = board.ships.find((s) => cellsOf(s).some(([cx, cy]) => cx === x && cy === y));
+      if (!ship) return 'MISS';
+      return ++ship.hits === ship.size ? 'SUNK' : 'HIT';
+    }
+    function randomFleet() {
+      const taken = new Set(), ships = [];
+      for (const size of SIZES) for (;;) {
+        const s = { size, horizontal: Math.random() < 0.5, x: rnd(10), y: rnd(10) };
+        const cs = cellsOf(s);
+        if (cs.every(([cx, cy]) => cx >= 0 && cx < 10 && cy >= 0 && cy < 10 && !taken.has(cx + ',' + cy))) {
+          cs.forEach(([cx, cy]) => taken.add(cx + ',' + cy)); ships.push(s); break;
+        }
+      }
+      return ships;
+    }
+    let enemy, mine;
+
+    async function botTurn() {            // máy bắn tới khi trượt (trúng thì bắn tiếp)
+      view.setTurn('ENEMY');
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 400));
+        let x, y, st;
+        do { x = rnd(10); y = rnd(10); st = fire(mine, x, y); } while (st === 'INVALID');
+        await view.showResult('player', x, y, st);
+        if (mine.ships.every((s) => s.hits === s.size)) return log('Máy thắng!');
+        if (st === 'MISS') break;
+      }
+      view.setTurn('PLAYER');
+    }
+
+    const view = new BoardView({
+      playerGridEl: document.getElementById('player-grid'),
+      enemyGridEl: document.getElementById('enemy-grid'),
+      enemyPanelEl: document.getElementById('enemy-panel'),
+      dockEl: document.getElementById('dock'),
+      fireBtnEl: document.getElementById('fire-btn'),
+      handlers: {
+        onFire(placement) {
+          console.log('Gửi sang Java:', JSON.stringify(placement));
+          mine = mkBoard(placement); enemy = mkBoard(randomFleet());
+          log('Giả lập Java: đã random 4 tàu địch. Click lưới địch để bắn!');
+          setTimeout(() => { view.enterBattle(); view.setTurn('PLAYER'); }, 300);
+        },
+        async onAttack(x, y) {
+          console.log('Gửi sang Java:', JSON.stringify({ action: 'FIRE', x, y }));
+          const st = fire(enemy, x, y);
+          await view.showResult('enemy', x, y, st);
+          if (enemy.ships.every((s) => s.hits === s.size)) return log('Bạn thắng!');
+          if (st === 'MISS') botTurn(); else view.setTurn('PLAYER'); // trúng -> bắn tiếp
+        },
+      },
+    });
+    document.addEventListener('shot', (e) => console.log('Âm thanh cho:', e.detail.status));
+  </script>
+</body>
+</html>
